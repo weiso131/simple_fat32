@@ -5,8 +5,8 @@
 
 void mount_disk(const char *path);
 
-void read_sector(uint32_t sector, uint8_t *buf);
+void read_sector(uint32_t sector, void *buf);
 
-void write_sector(uint32_t sector, const uint8_t *buf);
+void write_sector(uint32_t sector, const void *buf);
 
 void unmount_disk();
