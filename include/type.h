@@ -36,3 +36,42 @@ struct __attribute__((packed)) sector0_struct {
     uint8_t teddy[420];
     uint16_t boot_sec_sig; // 0xAA55
 };
+
+typedef struct {
+    uint32_t first_fat_sec;
+    uint32_t first_data_sec;
+    uint32_t byte_per_sec;
+    uint32_t sec_per_clus;
+    uint32_t root_clus;
+
+    uint32_t fs_info;
+    uint32_t fsi_free_cnt;
+    uint32_t fsi_nxt_free;
+} fat32_t;
+
+#define DIR_ATTR_READ_ONLY 0x01
+#define DIR_ATTR_HIDDEN 0x02
+#define DIR_ATTR_SYSTEM 0x04
+#define DIR_ATTR_VOLUME_ID 0x08
+#define DIR_ATTR_DIRECTORY 0x10
+#define DIR_ATTR_ARCHIVE 0x20
+#define DIR_ATTR_LONG_NAME (DIR_ATTR_READ_ONLY | \
+                            DIR_ATTR_HIDDEN | \
+                            DIR_ATTR_SYSTEM | \
+                            DIR_ATTR_VOLUME_ID)
+
+typedef struct __attribute__((packed)) {
+    uint8_t short_name[11]; 
+    uint8_t attr;
+    uint8_t ntres;
+    uint8_t crt_time_tenth;
+    uint16_t crt_time;
+    uint16_t crt_date;
+    uint16_t lst_acc_date;
+    uint16_t fst_clus_hi;
+    uint16_t wrt_time;
+    uint16_t wrt_date;
+    uint16_t fst_clus_lo;
+    uint32_t file_size;
+
+} fat32_dir_t;
