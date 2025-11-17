@@ -1,4 +1,7 @@
+#pragma once
+
 #include <stdint.h>
+#include <stddef.h>
 
 typedef struct __attribute__((packed)) {
     uint16_t byte_per_sec;
@@ -63,7 +66,7 @@ typedef struct {
 typedef struct __attribute__((packed)) {
     uint8_t short_name[11]; 
     uint8_t attr;
-    uint8_t ntres;
+    uint8_t ntres; // useless
     uint8_t crt_time_tenth;
     uint16_t crt_time;
     uint16_t crt_date;
@@ -75,3 +78,38 @@ typedef struct __attribute__((packed)) {
     uint32_t file_size;
 
 } fat32_dir_t;
+
+typedef struct __attribute__((packed)) {
+    uint8_t ord;
+    uint8_t name1[10];
+    uint8_t attr;
+    uint8_t type;
+    uint8_t chk_sum;
+    uint8_t name2[12];
+    uint16_t meow;
+    uint8_t name3[4];
+} fat32_long_name_t;
+
+typedef struct {
+    uint8_t *name; //long name, this maybe replace to uint8_t array in picos
+    uint16_t name_sz;
+    uint8_t attr;
+    uint32_t file_size;
+    uint32_t fst_clus;
+    struct dir_block *fst_dir_block;
+} file_t;
+
+/* assume a page size is 4KB */
+#define PAGE_SIZE 4096 
+#define LONGEST_NAME_SZ 520
+#define FILE_LST_SZ ((PAGE_SIZE - sizeof(struct dir_block *)) / sizeof(file_t))
+
+typedef struct dir_block{
+    file_t file_lst[FILE_LST_SZ];
+    size_t file_cnt;
+    struct dir_block *next;
+
+    /*
+        size of dir_block_t should close to page size
+    */
+} dir_block_t;
