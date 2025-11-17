@@ -90,8 +90,7 @@ void read_file(file_t *file, void *buf, size_t cnt)
     uint8_t *read_block = malloc(BLOCK_SIZE);
     uint8_t *fat_buf = malloc(BLOCK_SIZE);
     uint32_t clus = file->fst_clus;
-    uint32_t fat_sec = get_clus_fat_sec(file->fs, clus);
-    read_sector(fat_sec, fat_buf);
+    uint32_t fat_sec = 0;
 
     while (clus < END_OF_CLUS) {
         uint32_t first_sec = get_clus_first_sec(file->fs, clus);
@@ -113,7 +112,7 @@ void read_file(file_t *file, void *buf, size_t cnt)
             read_sector(fat_sec, fat_buf);
         }
 
-        clus = *((uint32_t *)(fat_buf + get_clus_fat_offset(file->fs, clus))) & 0x0FFFFFFF;
+        clus = get_next_clus(file->fs, clus, fat_buf); 
 
     }
 end_read:
