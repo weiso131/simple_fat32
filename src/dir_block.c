@@ -17,6 +17,8 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
 {
     fat32_dir_t *dir_buf = malloc(BLOCK_SIZE);
     uint8_t *name_stack = (uint8_t *)malloc(LONGEST_NAME_SZ);
+    uint8_t *fat_buf = malloc(BLOCK_SIZE);
+    uint32_t fat_sec = 0;
     uint16_t nsp = LONGEST_NAME_SZ;
 
     dir_block_t *head = create_dir_block();
@@ -64,7 +66,12 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
                 }
             }
         }
-        clus = get_next_clus(fs, clus);
+        if (get_clus_fat_sec(fs, clus) != fat_sec) {
+            fat_sec = get_clus_fat_sec(fs, clus);
+            read_sector(fat_sec, fat_buf);
+        }
+
+        clus = get_next_clus(fs, clus, fat_buf);
     }  
 ls_end:
     free(dir_buf);

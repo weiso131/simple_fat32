@@ -1,14 +1,6 @@
 #include <fat32_util.h>
 #include <disk_io.h>
 
-uint32_t get_next_clus(fat32_t *fs, uint32_t n)
-{
-    uint8_t sector[BLOCK_SIZE];
-    read_sector(get_clus_fat_sec(fs, n), sector);
-
-    return *((uint32_t *)(sector + get_clus_fat_offset(fs, n))) & 0x0FFFFFFF;
-}
-
 void update_next_clus(fat32_t *fs, uint32_t n, uint32_t ent_val)
 {
     uint32_t offset = get_clus_fat_offset(fs, n);

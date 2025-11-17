@@ -10,6 +10,6 @@
 
 void update_next_clus(fat32_t *fs, uint32_t n, uint32_t ent_val);
 
-uint32_t get_next_clus(fat32_t *fs, uint32_t n);
+#define get_next_clus(fs, clus, fat_buf) (*((uint32_t *)(fat_buf + get_clus_fat_offset(fs, clus))) & 0x0FFFFFFF)
 
 #define ascii_to_unicode_little(x) ((uint16_t) x)
