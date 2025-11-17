@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define END_OF_CLUS 0x0FFFFFF8
+
 typedef struct __attribute__((packed)) {
     uint16_t byte_per_sec;
     uint8_t sec_per_clus;
@@ -96,6 +98,7 @@ typedef struct {
     uint8_t attr;
     uint32_t file_size;
     uint32_t fst_clus;
+    fat32_t *fs;
     struct dir_block *fst_dir_block;
 } file_t;
 

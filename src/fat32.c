@@ -37,17 +37,89 @@ NOT_FAT32:
     return fs;
 }
 
+#define print_file_name(j, file) \
+    do {\
+        for (uint16_t j = 0;j < (file).name_sz && (file).name[j] != 0xFF;j++)\
+            if (is_valid_ascii((file).name[j]))\
+                printf("%c", (file).name[j]);\
+        printf("\n");\
+    } while(0)
+    
+
 void ls_dir(dir_block_t *dir)
 {
     for (dir_block_t *now = dir;now;now = now->next) {
+        for (size_t i = 0;i < now->file_cnt;i++)
+            print_file_name(j, now->file_lst[i]);
+        now = now->next;
+    }
+}
+
+file_t *find_file(dir_block_t *dir, const char *file_name, size_t name_size)
+{
+    uint16_t *unicode = malloc(sizeof(uint16_t) * name_size);
+
+    for (size_t i = 0;i < name_size;i++)
+        unicode[i] = file_name[i];
+
+    file_t *target = NULL;
+
+    for (dir_block_t *now = dir;now;now = now->next) {
         for (size_t i = 0;i < now->file_cnt;i++) {
-            for (uint16_t j = 0;j < now->file_lst[i].name_sz;j++)
-                if (is_valid_ascii(now->file_lst[i].name[j]))
-                    printf("%c", now->file_lst[i].name[j]);
-            printf("\n");
+            int result = memcmp(now->file_lst[i].name, unicode, sizeof(uint16_t) * name_size);
+            if (!result) {
+                target = now->file_lst + i;
+                goto find_file;
+            }
+                
         }
         now = now->next;
     }
+find_file:
+    free(unicode);
+    return target;
+}
+
+#define min(x, y) ((x < y) ? x : y)
+
+void read_file(file_t *file, void *buf, size_t cnt)
+{
+    if (file->file_size == 0)
+        return;
+
+    uint8_t *read_block = malloc(BLOCK_SIZE);
+    uint8_t *fat_buf = malloc(BLOCK_SIZE);
+    uint32_t clus = file->fst_clus;
+    uint32_t fat_sec = get_clus_fat_sec(file->fs, clus);
+    read_sector(fat_sec, fat_buf);
+
+    while (clus < END_OF_CLUS) {
+        uint32_t first_sec = get_clus_first_sec(file->fs, clus);
+
+        for (uint32_t i = 0;i < file->fs->sec_per_clus;i++) {
+            read_sector(first_sec + i, read_block);
+            int copy_size = min(cnt, BLOCK_SIZE);
+            memcpy(buf, read_block, copy_size);
+            buf += copy_size;
+            cnt -= copy_size;
+
+            if (cnt == 0) 
+                goto end_read;
+                
+        }
+
+        if (get_clus_fat_sec(file->fs, clus) != fat_sec) {
+            fat_sec = get_clus_fat_sec(file->fs, clus);
+            read_sector(fat_sec, fat_buf);
+        }
+
+        clus = *((uint32_t *)(fat_buf + get_clus_fat_offset(file->fs, clus))) & 0x0FFFFFFF;
+
+    }
+end_read:
+    free(read_block);
+    free(fat_buf);
+    return;
 }
 
 
@@ -60,6 +132,18 @@ int main()
 
     ls_dir(root);
 
+    char target_name[] = "meow.txt";
+
+    file_t *target = find_file(root, target_name, sizeof(target_name));
+
+    if (target)
+        print_file_name(j, *target);
+        
+    uint8_t *target_buf = malloc(BLOCK_SIZE);
+
+    read_file(target, target_buf, BLOCK_SIZE);
+
+    printf("%s", target_buf);
 
     unmount_disk();
     free(root);

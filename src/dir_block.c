@@ -49,6 +49,7 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
                 now->file_lst[now->file_cnt].fst_clus = (((uint32_t)dir_buf[j].fst_clus_hi) << 16) \
                                                         | (uint32_t)dir_buf[j].fst_clus_lo;
                 now->file_lst[now->file_cnt].attr = dir_buf[j].attr;
+                now->file_lst[now->file_cnt].fs = fs;
 
                 memcpy(now->file_lst[now->file_cnt].name, name_stack + nsp, LONGEST_NAME_SZ - nsp);
 

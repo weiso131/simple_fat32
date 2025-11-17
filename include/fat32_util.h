@@ -11,3 +11,5 @@
 void update_next_clus(fat32_t *fs, uint32_t n, uint32_t ent_val);
 
 uint32_t get_next_clus(fat32_t *fs, uint32_t n);
+
+#define ascii_to_unicode_little(x) ((uint16_t) x)
