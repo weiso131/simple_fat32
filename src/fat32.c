@@ -48,11 +48,9 @@ NOT_FAT32:
 
 void ls_dir(dir_block_t *dir)
 {
-    for (dir_block_t *now = dir;now;now = now->next) {
+    for (dir_block_t *now = dir;now;now = now->next)
         for (size_t i = 0;i < now->file_cnt;i++)
             print_file_name(j, now->file_lst[i]);
-        now = now->next;
-    }
 }
 
 file_t *find_file(dir_block_t *dir, const char *file_name, size_t name_size)
@@ -71,9 +69,7 @@ file_t *find_file(dir_block_t *dir, const char *file_name, size_t name_size)
                 target = now->file_lst + i;
                 goto find_file;
             }
-                
         }
-        now = now->next;
     }
 find_file:
     free(unicode);
