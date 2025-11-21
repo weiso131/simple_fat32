@@ -31,7 +31,7 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
 
     while (1) {
         uint32_t first_sec = get_clus_first_sec(fs, clus);
-        for (uint32_t i = 0;i < fs->sec_per_clus;i++) {
+        for (uint8_t i = 0;i < fs->sec_per_clus;i++) {
             read_sector(first_sec + i, dir_buf);
             uint16_t block_entry_start = 65535;
             for (uint32_t j = 0;j < BLOCK_SIZE / sizeof(fat32_dir_t);j++, entry_offset++) {

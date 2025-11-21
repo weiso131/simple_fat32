@@ -46,7 +46,7 @@ typedef struct {
     uint32_t first_fat_sec;
     uint32_t first_data_sec;
     uint32_t byte_per_sec;
-    uint32_t sec_per_clus;
+    uint8_t sec_per_clus;
     uint32_t root_clus;
 
     uint32_t fs_info;

@@ -99,7 +99,7 @@ void read_file(fat32_t *fs, file_t *file, void *buf, size_t cnt)
     while (clus < END_OF_CLUS) {
         uint32_t first_sec = get_clus_first_sec(fs, clus);
 
-        for (uint32_t i = 0;i < fs->sec_per_clus;i++) {
+        for (uint8_t i = 0;i < fs->sec_per_clus;i++) {
             read_sector(first_sec + i, read_block);
             int copy_size = min(cnt, BLOCK_SIZE);
             memcpy(buf, read_block, copy_size);
@@ -168,7 +168,7 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
         uint32_t next_clus = get_next_clus(fs, clus, fat_buf);
         if (write_cnt < size) {
             uint32_t first_sec = get_clus_first_sec(fs, clus);
-            for (uint32_t i = 0;i < fs->sec_per_clus;i++) {
+            for (uint8_t i = 0;i < fs->sec_per_clus;i++) {
                 if (write_cnt + BLOCK_SIZE > size) {
                     // To avoid wrong memory copy
                     uint8_t *tmp = malloc(BLOCK_SIZE);
@@ -216,7 +216,7 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
         }
         update_new_fsi_nxt_free(fs, fat_buf, fat_sec);
         uint32_t first_sec = get_clus_first_sec(fs, clus);
-        for (uint32_t i = 0;i < fs->sec_per_clus && write_cnt < size;i++, write_cnt += BLOCK_SIZE) {
+        for (uint8_t i = 0;i < fs->sec_per_clus && write_cnt < size;i++, write_cnt += BLOCK_SIZE) {
             if (write_cnt + BLOCK_SIZE > size) {
                 // To avoid wrong memory copy
                 uint8_t *tmp = malloc(BLOCK_SIZE);
