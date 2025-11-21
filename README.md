@@ -7,6 +7,7 @@ It provides a straightforward and clean codebase that focuses on correctness and
 
 - `ls_dir`
 - `read_file`
+- `write_file`
 
 More functionality will be added over time, including file creation, writing, caching improvements, and directory manipulation.
 
