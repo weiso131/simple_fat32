@@ -65,6 +65,11 @@ typedef struct {
                             DIR_ATTR_SYSTEM | \
                             DIR_ATTR_VOLUME_ID)
 
+#define DIR_ATTR_VAL_MASK 0x3F
+/* below attribute should not write back to disk */
+#define DIR_ATTR_DIRTY 0x40
+#define DIR_ATTR_NAME_CHANGE 0x80
+
 typedef struct __attribute__((packed)) {
     uint8_t short_name[11]; 
     uint8_t attr;
@@ -95,11 +100,13 @@ typedef struct __attribute__((packed)) {
 typedef struct {
     uint8_t *name; //long name, this maybe replace to uint8_t array in picos
     uint16_t name_sz;
+    uint16_t block_entry_start;
+    uint16_t block_entry_end; // entry offset in block
     uint8_t attr;
     uint32_t file_size;
     uint32_t fst_clus;
-    fat32_t *fs;
-    struct dir_block *fst_dir_block;
+    struct dir_block *dir;
+    struct dir_block *fst_dir_block; // if this file is dir
 } file_t;
 
 /* assume a page size is 4KB */
@@ -111,7 +118,9 @@ typedef struct dir_block{
     file_t file_lst[FILE_LST_SZ];
     size_t file_cnt;
     struct dir_block *next;
-
+    uint8_t attr;
+    uint32_t clus;
+    uint32_t entry_offset;
     /*
         size of dir_block_t should close to page size
     */
