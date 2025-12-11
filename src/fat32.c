@@ -6,34 +6,47 @@
 #include <type.h>
 #include <fat32_util.h>
 #include <dir_block.h>
+#include <picos_memory.h>
+
+unsigned char picos_cache[64];
+fat32_t __fs;
 
 fat32_t *create_fat32()
 {
     fat32_t *fs = NULL;
-    uint8_t sec_buf[BLOCK_SIZE];
-    struct sector0_struct *sector0 = (struct sector0_struct *) sec_buf;
+    addr_t sec_buf = picos_memory_alloc(BLOCK_SIZE  / 64);
+    picos_read_sector(0, sec_buf);
 
-    read_sector(0, sec_buf);
+    extern_memory_read(sec_buf + (512 - 64), picos_cache);
+    uint16_t boot_sec_sig = *((uint16_t *)(picos_cache + 62));
 
-    if (sector0->boot_sec_sig != 0xAA55 || sector0->bpb.fat_sz32 == 0)
+    extern_memory_read(sec_buf, picos_cache);
+    uint32_t fat_sz32 = *((uint32_t *)(picos_cache + 36));
+    
+    if (boot_sec_sig != 0xAA55 || fat_sz32 == 0)
         goto NOT_FAT32;
 
+    fs = &__fs;
+    fs->byte_per_sec = *((uint16_t *)(picos_cache + 11));
+    fs->sec_per_clus = picos_cache[13];
+    fs->first_fat_sec = *((uint16_t *)(picos_cache + 14));
+    uint8_t num_fats = picos_cache[16];
+    
+    fs->first_data_sec = fs->first_fat_sec + num_fats * fat_sz32;
 
-    fs = malloc(sizeof(fat32_t));
-    fs->first_fat_sec = sector0->bpb.rsvd_sec_cnt;
-    fs->first_data_sec = fs->first_fat_sec + \
-            sector0->bpb.num_fats * sector0->bpb.fat_sz32;
-    fs->byte_per_sec = sector0->bpb.byte_per_sec;
-    fs->sec_per_clus = sector0->bpb.sec_per_clus;
-    fs->root_clus = sector0->bpb.root_clus;
-    fs->fs_info = sector0->bpb.fs_info;
+    fs->root_clus = *((uint32_t *)(picos_cache + 44));
+    fs->fs_info = *((uint16_t *)(picos_cache + 48));
 
-    read_sector(fs->fs_info, sec_buf);
-    fs->fsi_free_cnt = *((uint32_t *)(sec_buf + 488));
-    fs->fsi_nxt_free = *((uint32_t *)(sec_buf + 492));
 
+    picos_read_sector(fs->fs_info, sec_buf);
+
+    extern_memory_read(sec_buf + 448, picos_cache);
+
+    fs->fsi_free_cnt = *((uint32_t *)(picos_cache + 40));
+    fs->fsi_nxt_free = *((uint32_t *)(picos_cache + 44));
 
 NOT_FAT32:
+    picos_memory_release(sec_buf);
     return fs;
 }
 
@@ -282,20 +295,9 @@ void release_fat32(fat32_t **fs)
     *((uint32_t *)(sec_buf + 492)) = (*fs)->fsi_nxt_free;
     write_sector((*fs)->fs_info, sec_buf);
     free(sec_buf);
-    free(*fs);
-    *fs = NULL;
 }
 
-const char text[] = "A teddy bear, or simply a teddy, is a stuffed toy in the form of a bear. \n"
-                  "The teddy bear was named by Morris Michtom after the 26th president of the United States, \n"
-                  "Theodore Roosevelt; it was developed apparently simultaneously in the first decade of the 20th \n"
-                  "century by two toymakers: Richard Steiff in Germany and Michtom in the United States. \n"
-                  "It became a popular children's toy, and it has been celebrated in story, song, and film. \n"
-                  "Since the creation of the first teddy bears (which sought to imitate the form of real bear cubs), \n"
-                  "teddies have greatly varied in form, style, color, and material. \n"
-                  "They have become collector's items, with older and rarer teddies appearing at public auctions.\n"
-                  "[2] Teddy bears are among the most popular gifts for children, and they are often given to\n"
-                  "adults to signify affection, congratulations, or sympathy. ";
+const char text[] = "test\n";
 
 int main()
 {
