@@ -11,8 +11,6 @@
 dir_block_t *create_dir_block(uint32_t entry_offset, uint32_t clus)
 {
     dir_block_t *new = malloc(sizeof(dir_block_t));
-    new->file_cnt = 0;
-    new->attr = 0;
     new->entry_offset = entry_offset;
     new->clus = clus;
     return new;
@@ -48,30 +46,38 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
                     if (dir_cache[k].attr == DIR_ATTR_LONG_NAME) {
                         fat32_long_name_t *long_name = (fat32_long_name_t *)(dir_cache + k);
                         
-                        memcpy(now->file_lst[now->file_cnt].name + 10, long_name->name2, 12);
-                        memcpy(now->file_lst[now->file_cnt].name, long_name->name1, 10);
+                        uint8_t x = 0;
+                        for (uint8_t name_idx = 0;name_idx < 10;name_idx++) {
+                            if (is_valid_ascii(long_name->name1[name_idx])) {
+                                now->file.name[x] = long_name->name1[name_idx];
+                                x++;
+                            }
+                        }
+                        for (uint8_t name_idx = 0;name_idx < 12;name_idx++) {
+                            if (is_valid_ascii(long_name->name2[name_idx])) {
+                                now->file.name[x] = long_name->name2[name_idx];
+                                x++;
+                            }
+                        }
 
                         if (block_entry_start == 65535)
                             block_entry_start = entry_offset - now->entry_offset;
                     }
                     if (dir_cache[k].attr & (DIR_ATTR_VOLUME_ID))
                         continue;
-                    now->file_lst[now->file_cnt].block_entry_start = block_entry_start;
+                    now->file.block_entry_start = block_entry_start;
                     block_entry_start = 65535;
-                    now->file_lst[now->file_cnt].block_entry_end = entry_offset - now->entry_offset;
-                    now->file_lst[now->file_cnt].file_size = dir_cache[k].file_size;
-                    now->file_lst[now->file_cnt].fst_clus = (((uint32_t)dir_cache[k].fst_clus_hi) << 16) \
+                    now->file.block_entry_end = entry_offset - now->entry_offset;
+                    now->file.file_size = dir_cache[k].file_size;
+                    now->file.fst_clus = (((uint32_t)dir_cache[k].fst_clus_hi) << 16) \
                                                             | (uint32_t)dir_cache[k].fst_clus_lo;
-                    now->file_lst[now->file_cnt].attr = dir_cache[k].attr;
-                    now->file_lst[now->file_cnt].dir = now;
+                    now->file.attr = dir_cache[k].attr;
 
-                    now->file_cnt++;
-                    if (now->file_cnt == FILE_LST_SZ) {
-                        dir_block_t *new_block = create_dir_block(entry_offset, clus);
-                        now->next = new_block;
-                        now->clus = clus;
-                        now = new_block;
-                    }
+
+                    dir_block_t *new_block = create_dir_block(entry_offset, clus);
+                    now->next = new_block;
+                    now->clus = clus;
+                    now = new_block;
                     
                 }
             }
@@ -99,8 +105,6 @@ ls_end:
 void free_dir_block(dir_block_t **dir)
 {
     for (dir_block_t *now = *dir;now;now = now->next) {
-        for (size_t i = 0;i < now->file_cnt;i++)
-            free(now->file_lst[i].name);
         dir_block_t *trash = now;
         now = now->next;
         free(trash);

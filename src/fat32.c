@@ -14,7 +14,6 @@ fat32_t __fs;
 
 fat32_t *create_fat32()
 {
-    sizeof(dir_block_t);
     fat32_t *fs = NULL;
     addr_t sec_buf = picos_memory_alloc(BLOCK_SIZE  / 64);
     picos_read_sector(0, sec_buf);
@@ -64,30 +63,22 @@ NOT_FAT32:
 void ls_dir(dir_block_t *dir)
 {
     for (dir_block_t *now = dir;now;now = now->next)
-        for (size_t i = 0;i < now->file_cnt;i++)
-            print_file_name(j, now->file_lst[i]);
+        print_file_name(j, now->file);
 }
 
-file_t *find_file(dir_block_t *dir, const char *file_name, size_t name_size)
+file_t *find_file(dir_block_t *dir, const char *file_name, uint8_t name_size)
 {
-    uint16_t *unicode = malloc(sizeof(uint16_t) * name_size);
-
-    for (size_t i = 0;i < name_size;i++)
-        unicode[i] = file_name[i];
 
     file_t *target = NULL;
 
     for (dir_block_t *now = dir;now;now = now->next) {
-        for (size_t i = 0;i < now->file_cnt;i++) {
-            int result = memcmp(now->file_lst[i].name, unicode, sizeof(uint16_t) * name_size);
-            if (!result) {
-                target = now->file_lst + i;
-                goto find_file;
-            }
+        int result = memcmp(now->file.name, file_name, name_size);
+        if (!result) {
+            target = &now->file;
+            goto find_file;
         }
     }
 find_file:
-    free(unicode);
     return target;
 }
 
@@ -174,7 +165,6 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
 
     uint32_t write_cnt = 0;
 
-    file->dir->attr |= DIR_ATTR_DIRTY;
     file->attr |= DIR_ATTR_DIRTY;
 
     file->file_size = size;
@@ -257,29 +247,25 @@ void dir_update(fat32_t *fs, dir_block_t *dir)
     uint32_t fat_sec = -1;
     uint32_t dir_sec = 0;
     for (dir_block_t *now = dir;now;now = now->next) {
-        if (!(now->attr &= DIR_ATTR_DIRTY))
+        if (!(now->file.attr &= DIR_ATTR_DIRTY))
             continue;
-        for (size_t i = 0;i < now->file_cnt;i++) {
-            if (!(now->file_lst[i].attr &= DIR_ATTR_DIRTY))
-                continue;
-            if (!(now->file_lst[i].attr &= DIR_ATTR_NAME_CHANGE)) {
-                uint32_t x = now->file_lst[i].block_entry_end;
-                uint32_t clus_num = x / (BLOCK_SIZE / 32 * fs->sec_per_clus);
-                uint8_t sec = (x / (BLOCK_SIZE / 32)) % fs->sec_per_clus;
-                uint32_t num = (x / fs->sec_per_clus) % (BLOCK_SIZE / 32);
-                uint32_t clus = now->clus;
+        if (!(now->file.attr &= DIR_ATTR_NAME_CHANGE)) {
+            uint32_t x = now->file.block_entry_end;
+            uint32_t clus_num = x / (BLOCK_SIZE / 32 * fs->sec_per_clus);
+            uint8_t sec = (x / (BLOCK_SIZE / 32)) % fs->sec_per_clus;
+            uint32_t num = (x / fs->sec_per_clus) % (BLOCK_SIZE / 32);
+            uint32_t clus = now->clus;
 
-                for (uint32_t j = 0;j < clus_num;j++) {
-                    update_fat_read(fs, clus, fat_sec, fat_buf);
-                    clus = get_next_clus(fs, clus, fat_buf);
-                }
-                if (dir_sec != get_clus_first_sec(fs, clus) + sec) {
-                    if (dir_sec)
-                        write_sector(dir_sec, dir_buf);
-                    dir_sec = get_clus_first_sec(fs, clus) + sec;
-                    read_sector(dir_sec, dir_buf);
-                    dir_buf[num].file_size = now->file_lst[i].file_size;
-                }
+            for (uint32_t j = 0;j < clus_num;j++) {
+                update_fat_read(fs, clus, fat_sec, fat_buf);
+                clus = get_next_clus(fs, clus, fat_buf);
+            }
+            if (dir_sec != get_clus_first_sec(fs, clus) + sec) {
+                if (dir_sec)
+                    write_sector(dir_sec, dir_buf);
+                dir_sec = get_clus_first_sec(fs, clus) + sec;
+                read_sector(dir_sec, dir_buf);
+                dir_buf[num].file_size = now->file.file_size;
             }
         }
     }

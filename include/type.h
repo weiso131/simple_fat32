@@ -60,27 +60,21 @@ typedef struct __attribute__((packed)) {
     uint8_t name3[4];
 } fat32_long_name_t;
 
+#define LONGEST_NAME_SZ 11
+
 typedef struct {
-    uint8_t name[22]; //long name, this maybe replace to uint8_t array in picos
+    uint8_t name[LONGEST_NAME_SZ]; //long name, this maybe replace to uint8_t array in picos
     uint16_t block_entry_start;
     uint16_t block_entry_end; // entry offset in block
     uint8_t attr;
     uint32_t file_size;
     uint32_t fst_clus;
-    struct dir_block *dir;
     struct dir_block *fst_dir_block; // if this file is dir
 } file_t;
 
-/* assume a page size is 4KB */
-#define PAGE_SIZE 4096 
-#define LONGEST_NAME_SZ 22
-#define FILE_LST_SZ ((PAGE_SIZE - sizeof(struct dir_block *)) / sizeof(file_t))
-
 typedef struct dir_block{
-    file_t file_lst[FILE_LST_SZ];
-    size_t file_cnt;
+    file_t file;
     struct dir_block *next;
-    uint8_t attr;
     uint32_t clus;
     uint32_t entry_offset;
     /*
