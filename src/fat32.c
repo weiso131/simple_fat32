@@ -11,6 +11,8 @@
 unsigned char picos_fat_cache[64];
 unsigned char picos_cache[64];
 unsigned char dir_block_cache[64];
+unsigned char file_cache[64];
+
 fat32_t __fs;
 
 fat32_t *create_fat32()
@@ -73,18 +75,21 @@ void ls_dir(addr_t dir)
         
 }
 
-file_t *find_file(dir_block_t *dir, const char *file_name, uint8_t name_size)
+addr_t find_file(addr_t dir, const char *file_name, uint8_t name_size)
 {
-
-    file_t *target = NULL;
-
-    for (dir_block_t *now = dir;now;now = now->next) {
-        int result = memcmp(now->file.name, file_name, name_size);
+    addr_t target = 0;
+    while (1) {
+        if (dir == EXTERN_NULL)
+            break;
+        extern_memory_read(dir, dir_block_cache);
+        int result = memcmp(((dir_block_t *)dir_block_cache)->file.name, file_name, name_size);
         if (!result) {
-            target = &now->file;
+            target = dir;
             goto find_file;
         }
+        dir = (addr_t)(((dir_block_t *)dir_block_cache)->next);
     }
+
 find_file:
     return target;
 }
@@ -305,7 +310,9 @@ int main()
 
     char target_name[] = "meow.txt";
 
-    file_t *target = find_file(root, target_name, sizeof(target_name));
+    addr_t target_addr = find_file((addr_t)root, target_name, sizeof(target_name));
+    extern_memory_read(target_addr, file_cache);
+    file_t *target = (file_t *)file_cache;
 
     printf("%d\n", target->file_size);
 
