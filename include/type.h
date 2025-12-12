@@ -5,43 +5,6 @@
 
 #define END_OF_CLUS 0x0FFFFFF8
 
-typedef struct __attribute__((packed)) {
-    uint16_t byte_per_sec;
-    uint8_t sec_per_clus;
-    uint16_t rsvd_sec_cnt;
-    uint8_t num_fats;
-    uint16_t root_ent_cnt;
-    uint16_t tot_sec_16; // 0 in fat32
-    uint8_t media;
-    uint16_t fat_sz_16; // 0 in fat32
-    uint16_t sec_per_trk; // useless when use flash
-    uint16_t num_heads; // useless when use flash
-    uint32_t hidd_sec;
-    uint32_t tot_sec32;
-    // fat32 only:
-    uint32_t fat_sz32;
-    uint16_t ext_flags; // [0-3]: user fat num, [7]: 0 mirror to all FAT
-    uint16_t fs_ver;
-    uint32_t root_clus;
-    uint16_t fs_info;
-    uint16_t bk_boot_sec;
-    uint8_t reserved[12];
-} bpb_t;
-
-struct __attribute__((packed)) sector0_struct {
-    uint8_t bs_jmpBoot[3];
-    uint8_t bs_oem_name[8];
-    bpb_t bpb;
-    uint8_t drv_num;
-    uint8_t reserved1;
-    uint8_t bs_boot_sig;
-    uint32_t vol_ID;
-    uint8_t vol_lab[11];
-    char file_sys_type[8]; // "FAT32"
-    uint8_t teddy[420];
-    uint16_t boot_sec_sig; // 0xAA55
-};
-
 typedef struct {
     uint32_t first_fat_sec;
     uint32_t first_data_sec;
@@ -98,8 +61,7 @@ typedef struct __attribute__((packed)) {
 } fat32_long_name_t;
 
 typedef struct {
-    uint8_t *name; //long name, this maybe replace to uint8_t array in picos
-    uint16_t name_sz;
+    uint8_t name[22]; //long name, this maybe replace to uint8_t array in picos
     uint16_t block_entry_start;
     uint16_t block_entry_end; // entry offset in block
     uint8_t attr;
@@ -111,7 +73,7 @@ typedef struct {
 
 /* assume a page size is 4KB */
 #define PAGE_SIZE 4096 
-#define LONGEST_NAME_SZ 520
+#define LONGEST_NAME_SZ 22
 #define FILE_LST_SZ ((PAGE_SIZE - sizeof(struct dir_block *)) / sizeof(file_t))
 
 typedef struct dir_block{

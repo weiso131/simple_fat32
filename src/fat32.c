@@ -8,11 +8,13 @@
 #include <dir_block.h>
 #include <picos_memory.h>
 
+unsigned char picos_fat_cache[64];
 unsigned char picos_cache[64];
 fat32_t __fs;
 
 fat32_t *create_fat32()
 {
+    sizeof(dir_block_t);
     fat32_t *fs = NULL;
     addr_t sec_buf = picos_memory_alloc(BLOCK_SIZE  / 64);
     picos_read_sector(0, sec_buf);
@@ -52,7 +54,7 @@ NOT_FAT32:
 
 #define print_file_name(j, file) \
     do {\
-        for (uint16_t j = 0;j < (file).name_sz && (file).name[j] != 0xFF;j++)\
+        for (uint16_t j = 0;j < LONGEST_NAME_SZ && (file).name[j] != 0xFF;j++)\
             if (is_valid_ascii((file).name[j]))\
                 printf("%c", (file).name[j]);\
         printf("\n");\

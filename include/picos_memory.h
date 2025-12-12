@@ -36,3 +36,6 @@ static void picos_memory_release(addr_t addr)
 {
     free((char *)addr);
 }
+
+extern unsigned char picos_fat_cache[64];
+extern unsigned char picos_cache[64];
