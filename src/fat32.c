@@ -61,10 +61,16 @@ NOT_FAT32:
     } while(0)
     
 
-void ls_dir(dir_block_t *dir)
+void ls_dir(addr_t dir)
 {
-    for (dir_block_t *now = dir;now;now = now->next)
-        print_file_name(j, now->file);
+    while (1) {
+        if (dir == EXTERN_NULL)
+            break;
+        extern_memory_read(dir, dir_block_cache);
+        print_file_name(j, ((dir_block_t *)dir_block_cache)->file);
+        dir = (addr_t)(((dir_block_t *)dir_block_cache)->next);
+    }
+        
 }
 
 file_t *find_file(dir_block_t *dir, const char *file_name, uint8_t name_size)
@@ -295,7 +301,7 @@ int main()
     fat32_t *fs = create_fat32();
     dir_block_t *root = load_dir(fs, fs->root_clus);
 
-    ls_dir(root);
+    ls_dir((addr_t)root);
 
     char target_name[] = "meow.txt";
 
