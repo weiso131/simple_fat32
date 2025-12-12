@@ -10,6 +10,7 @@
 
 unsigned char picos_fat_cache[64];
 unsigned char picos_cache[64];
+unsigned char dir_block_cache[64];
 fat32_t __fs;
 
 fat32_t *create_fat32()
@@ -317,6 +318,7 @@ int main()
 
     release_fat32(&fs);
     unmount_disk();
-    free(root);
+
+    free_dir_block((addr_t)root);
 
 }

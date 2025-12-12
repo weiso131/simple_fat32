@@ -1,3 +1,4 @@
+#pragma once
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -6,13 +7,16 @@
 
 typedef unsigned long addr_t;
 
+#define EXTERN_NULL NULL
+
 static void extern_memory_read(addr_t block_addr, unsigned char *dest)
 {
     memcpy(dest, (unsigned char *)block_addr, 64);
 }
 
-static void extern_memory_write(uint16_t block_addr, unsigned char *src)
+static void extern_memory_write(addr_t block_addr, unsigned char *src)
 {
+    memcpy((unsigned char *)block_addr, src, 64);
     return;
 }
 
@@ -39,3 +43,4 @@ static void picos_memory_release(addr_t addr)
 
 extern unsigned char picos_fat_cache[64];
 extern unsigned char picos_cache[64];
+extern unsigned char dir_block_cache[64];

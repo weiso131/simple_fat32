@@ -6,16 +6,6 @@
 #include <fat32_util.h>
 #include <dir_block.h>
 
-#include <picos_memory.h>
-
-dir_block_t *create_dir_block(uint32_t entry_offset, uint32_t clus)
-{
-    dir_block_t *new = malloc(sizeof(dir_block_t));
-    new->entry_offset = entry_offset;
-    new->clus = clus;
-    return new;
-}
-
 dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
 {
     addr_t dir_buf = picos_memory_alloc(BLOCK_SIZE / 64);
@@ -24,8 +14,14 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
     addr_t fat_buf = picos_memory_alloc(BLOCK_SIZE / 64);
     uint32_t fat_sec = 0;
 
-    dir_block_t *head = create_dir_block(0, clus);
-    dir_block_t *now = head;
+    /* create new dir_block */
+    addr_t now_addr = picos_memory_alloc(512 >> 6);
+    extern_memory_read(now_addr, dir_block_cache);
+    dir_block_t *now = (dir_block_t *)dir_block_cache;
+    now->entry_offset = 0;
+    now->clus = clus;
+
+    addr_t head = now_addr;
 
     uint32_t entry_offset = 0;
 
@@ -72,12 +68,17 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
                     now->file.fst_clus = (((uint32_t)dir_cache[k].fst_clus_hi) << 16) \
                                                             | (uint32_t)dir_cache[k].fst_clus_lo;
                     now->file.attr = dir_cache[k].attr;
-
-
-                    dir_block_t *new_block = create_dir_block(entry_offset, clus);
-                    now->next = new_block;
                     now->clus = clus;
-                    now = new_block;
+
+                    addr_t new_block = picos_memory_alloc(BLOCK_SIZE >> 6);\                    
+                    now->next = (dir_block_t *)new_block;
+
+                    extern_memory_write(now_addr, (uint8_t *)now);
+
+                    extern_memory_read(new_block, (uint8_t *)now);
+                    now_addr = new_block;
+                    now->entry_offset = entry_offset;
+                    now->clus = clus;
                     
                 }
             }
@@ -97,17 +98,20 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
 ls_end:
     picos_memory_release(dir_buf);
     picos_memory_release(fat_buf);
-    now->next = NULL;
+    now->next = EXTERN_NULL;
+    extern_memory_write(now_addr, (uint8_t *)now);
     
-    return head;
+    return (dir_block_t *)head;
 }
 
-void free_dir_block(dir_block_t **dir)
+void free_dir_block(addr_t dir)
 {
-    for (dir_block_t *now = *dir;now;now = now->next) {
-        dir_block_t *trash = now;
-        now = now->next;
-        free(trash);
+    while (1) {
+        if (dir == EXTERN_NULL)
+            break;
+        extern_memory_read(dir, dir_block_cache);
+        picos_memory_release(dir);
+        dir = (addr_t)(((dir_block_t *)dir_block_cache)->next);
+        
     }
-    *dir = NULL;
 }
