@@ -96,47 +96,45 @@ find_file:
 
 #define min(x, y) ((x < y) ? x : y)
 
-#define update_fat_read(fs, clus, fat_sec, fat_buf) \
-    do {\
-        if (get_clus_fat_sec(fs, clus) != fat_sec) {\
-            fat_sec = get_clus_fat_sec(fs, clus);\
-            read_sector(fat_sec, fat_buf);\
-        }\
-    } while (0)
-
-void read_file(fat32_t *fs, file_t *file, void *buf, size_t cnt)
+void read_file(fat32_t *fs, file_t *file, addr_t read_extern_buf, size_t cnt)
 {
     if (file->file_size == 0)
         return;
+    if (cnt & 0x1ff != 0)
+        return;
 
-    uint8_t *read_block = malloc(BLOCK_SIZE);
-    uint8_t *fat_buf = malloc(BLOCK_SIZE);
+    addr_t fat_extern_buf = picos_memory_alloc(BLOCK_SIZE >> 6);
+    addr_t tmp_extern_buf = picos_memory_alloc(BLOCK_SIZE >> 6);
     uint32_t clus = file->fst_clus;
     uint32_t fat_sec = 0;
 
     while (clus < END_OF_CLUS) {
         uint32_t first_sec = get_clus_first_sec(fs, clus);
-
+        
         for (uint8_t i = 0;i < fs->sec_per_clus;i++) {
-            read_sector(first_sec + i, read_block);
-            int copy_size = min(cnt, BLOCK_SIZE);
-            memcpy(buf, read_block, copy_size);
-            buf += copy_size;
-            cnt -= copy_size;
-
+            picos_read_sector(first_sec + i, tmp_extern_buf);
+            for (uint16_t j = 0;j < BLOCK_SIZE;j += 64, read_extern_buf += 64) {
+                extern_memory_read(tmp_extern_buf + j, picos_cache);
+                extern_memory_write(read_extern_buf, picos_cache);
+            }
+            cnt -= BLOCK_SIZE;
             if (cnt == 0) 
                 goto end_read;
-                
+        }
+        
+        if (((fs)->first_fat_sec + (clus * 4) / (fs)->byte_per_sec) != fat_sec) {
+            fat_sec = ((fs)->first_fat_sec + (clus * 4) / (fs)->byte_per_sec);
+            picos_read_sector(fat_sec, fat_extern_buf);
         }
 
-        update_fat_read(fs, clus, fat_sec, fat_buf);
+        extern_memory_read(fat_extern_buf + ((((clus * 4) % (fs)->byte_per_sec) / 64) * 64), picos_fat_cache); //maybe can reduce memory read
 
-        clus = get_next_clus(fs, clus, fat_buf); 
+        clus = *((uint32_t *)(picos_fat_cache + (((clus * 4) % (fs)->byte_per_sec) % 64))) & 0x0FFFFFFF;
 
     }
 end_read:
-    free(read_block);
-    free(fat_buf);
+    picos_memory_release(tmp_extern_buf);
+    picos_memory_release(fat_extern_buf);
     return;
 }
 
@@ -158,7 +156,10 @@ void update_new_fsi_nxt_free(fat32_t *fs, uint8_t *fat_buf, uint32_t fat_sec)
 
     while (get_next_clus(fs, fs->fsi_nxt_free, fat_buf) != 0) {
         fs->fsi_nxt_free++;
-        update_fat_read(fs, fs->fsi_nxt_free, fat_sec, fat_buf);
+        if (((fs)->first_fat_sec + (fs->fsi_nxt_free * 4) / (fs)->byte_per_sec) != fat_sec) {
+            fat_sec = ((fs)->first_fat_sec + (fs->fsi_nxt_free * 4) / (fs)->byte_per_sec);
+            read_sector(fat_sec, fat_buf);
+        }
     }
     fs->fsi_free_cnt--;
 
@@ -269,7 +270,10 @@ void dir_update(fat32_t *fs, dir_block_t *dir)
             uint32_t clus = now->clus;
 
             for (uint32_t j = 0;j < clus_num;j++) {
-                update_fat_read(fs, clus, fat_sec, fat_buf);
+                if (((fs)->first_fat_sec + (clus * 4) / (fs)->byte_per_sec) != fat_sec) {
+                    fat_sec = ((fs)->first_fat_sec + (clus * 4) / (fs)->byte_per_sec);
+                    read_sector(fat_sec, fat_buf);
+                }
                 clus = get_next_clus(fs, clus, fat_buf);
             }
             if (dir_sec != get_clus_first_sec(fs, clus) + sec) {
@@ -297,7 +301,16 @@ void release_fat32(fat32_t **fs)
     free(sec_buf);
 }
 
-const char text[] = "test\n";
+const char text[] = "A teddy bear, or simply a teddy, is a stuffed toy in the form of a bear. \n"
+                  "The teddy bear was named by Morris Michtom after the 26th president of the United States, \n"
+                  "Theodore Roosevelt; it was developed apparently simultaneously in the first decade of the 20th \n"
+                  "century by two toymakers: Richard Steiff in Germany and Michtom in the United States. \n"
+                  "It became a popular children's toy, and it has been celebrated in story, song, and film. \n"
+                  "Since the creation of the first teddy bears (which sought to imitate the form of real bear cubs), \n"
+                  "teddies have greatly varied in form, style, color, and material. \n"
+                  "They have become collector's items, with older and rarer teddies appearing at public auctions.\n"
+                  "[2] Teddy bears are among the most popular gifts for children, and they are often given to\n"
+                  "adults to signify affection, congratulations, or sympathy. ";
 
 int main()
 {
@@ -318,12 +331,21 @@ int main()
 
     if (target)
         print_file_name(j, *target);
-        
-    uint8_t *target_buf = malloc(sizeof(text));
+    
+    uint32_t target_size = ((sizeof(text) + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
+    addr_t target_buf = picos_memory_alloc(target_size / 64); // this is gerneral memory region
 
-    read_file(fs, target, target_buf, sizeof(text));
+    read_file(fs, target, target_buf, target_size);
 
-    printf("%s\n", target_buf);
+    for (int i = 0;i < target_size;i += 64) {
+        extern_memory_read(target_buf + i, picos_cache);
+        for (int j = 0;j < 64;j++)
+            printf("%c", picos_cache[j]);
+    }
+
+    printf("\n");
+
+
 
     write_file(fs, target, text, sizeof(text));
 
