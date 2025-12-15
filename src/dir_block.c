@@ -15,7 +15,7 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
     uint32_t fat_sec = 0;
 
     /* create new dir_block */
-    addr_t now_addr = picos_memory_alloc(512 >> 6);
+    addr_t now_addr = picos_memory_alloc(1);// this is gerneral memory region
     extern_memory_read(now_addr, dir_block_cache);
     dir_block_t *now = (dir_block_t *)dir_block_cache;
     now->entry_offset = 0;
@@ -70,7 +70,7 @@ dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
                     now->file.attr = dir_cache[k].attr;
                     now->clus = clus;
 
-                    addr_t new_block = picos_memory_alloc(BLOCK_SIZE >> 6);\                    
+                    addr_t new_block = picos_memory_alloc(1);// this is gerneral memory region
                     now->next = (dir_block_t *)new_block;
 
                     extern_memory_write(now_addr, (uint8_t *)now);
