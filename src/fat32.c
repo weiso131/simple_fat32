@@ -138,34 +138,39 @@ end_read:
     return;
 }
 
-void update_new_fsi_nxt_free(fat32_t *fs, uint8_t *fat_buf, uint32_t fat_sec)
+/* check if fsi_nxt_free is used, if still free do nothing, is used find new fsi_nxt_free */
+void update_new_fsi_nxt_free(fat32_t *fs, addr_t fat_extern_buf, uint32_t fat_sec)
 {
     char flag = 0;
     // if has fat_buf, use it
 
-    if (!fat_buf || (get_clus_fat_sec(fs, fs->fsi_nxt_free) != fat_sec)) {
+    if ((fat_extern_buf != EXTERN_NULL) || (get_clus_fat_sec(fs, fs->fsi_nxt_free) != fat_sec)) {
         fat_sec = get_clus_fat_sec(fs, fs->fsi_nxt_free);
-        fat_buf = malloc(BLOCK_SIZE);
-        read_sector(fat_sec, fat_buf);
+        fat_extern_buf = picos_memory_alloc(BLOCK_SIZE >> 6);
+        picos_read_sector(fat_sec, fat_extern_buf);
         flag = 1;
     }
-    if (get_next_clus(fs, fs->fsi_nxt_free, fat_buf) == 0) 
+
+    extern_memory_read(fat_extern_buf, picos_fat_cache);
+
+    if (get_next_clus(fs, fs->fsi_nxt_free, picos_fat_cache) == 0) 
         goto fsi_nxt_free_still_free;
 
     fs->fsi_nxt_free++;
 
-    while (get_next_clus(fs, fs->fsi_nxt_free, fat_buf) != 0) {
+    while (get_next_clus(fs, fs->fsi_nxt_free, picos_fat_cache) != 0) {
         fs->fsi_nxt_free++;
         if (((fs)->first_fat_sec + (fs->fsi_nxt_free * 4) / (fs)->byte_per_sec) != fat_sec) {
             fat_sec = ((fs)->first_fat_sec + (fs->fsi_nxt_free * 4) / (fs)->byte_per_sec);
-            read_sector(fat_sec, fat_buf);
+            picos_read_sector(fat_sec, fat_extern_buf);
+            extern_memory_read(fat_extern_buf, picos_fat_cache);
         }
     }
     fs->fsi_free_cnt--;
 
 fsi_nxt_free_still_free:
     if (flag)
-        free(fat_buf);
+        picos_memory_release(fat_extern_buf);
 
 }
 
@@ -232,7 +237,7 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
             fat_sec = get_clus_fat_sec(fs, clus);
             read_sector(fat_sec, fat_buf);
         }
-        update_new_fsi_nxt_free(fs, fat_buf, fat_sec);
+        update_new_fsi_nxt_free(fs, (addr_t)fat_buf, fat_sec);
         uint32_t first_sec = get_clus_first_sec(fs, clus);
         for (uint8_t i = 0;i < fs->sec_per_clus && write_cnt < size;i++, write_cnt += BLOCK_SIZE) {
             if (write_cnt + BLOCK_SIZE > size) {
@@ -348,6 +353,7 @@ int main()
 
 
     write_file(fs, target, text, sizeof(text));
+    extern_memory_write(target_addr, file_cache);
 
     dir_update(fs, root);   
 
