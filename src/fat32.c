@@ -312,11 +312,14 @@ next_dir:
 void release_fat32(fat32_t **fs)
 {
     // write back fsinfo
-    uint8_t *sec_buf = malloc(BLOCK_SIZE);
-    *((uint32_t *)(sec_buf + 488)) = (*fs)->fsi_free_cnt;
-    *((uint32_t *)(sec_buf + 492)) = (*fs)->fsi_nxt_free;
-    write_sector((*fs)->fs_info, sec_buf);
-    free(sec_buf);
+    addr_t tmp_extern_buf = picos_memory_alloc(BLOCK_SIZE >> 6);
+    
+    *((uint32_t *)(picos_cache + 40)) = (*fs)->fsi_free_cnt;
+    *((uint32_t *)(picos_cache + 44)) = (*fs)->fsi_nxt_free;
+    extern_memory_write(tmp_extern_buf, picos_cache);
+    picos_write_sector((*fs)->fs_info, tmp_extern_buf);
+
+    picos_memory_release(tmp_extern_buf);
 }
 
 const char text[] = "A teddy bear, or simply a teddy, is a stuffed toy in the form of a bear. \n"
