@@ -100,7 +100,7 @@ void read_file(fat32_t *fs, file_t *file, addr_t read_extern_buf, size_t cnt)
 {
     if (file->file_size == 0)
         return;
-    if (cnt & 0x1ff != 0)
+    if ((cnt & 0x1ff) != 0)
         return;
 
     addr_t fat_extern_buf = picos_memory_alloc(BLOCK_SIZE >> 6);
@@ -342,7 +342,7 @@ int main()
 
     read_file(fs, target, target_buf, target_size);
 
-    for (int i = 0;i < target_size;i += 64) {
+    for (uint32_t i = 0;i < target_size;i += 64) {
         extern_memory_read(target_buf + i, picos_cache);
         for (int j = 0;j < 64;j++)
             printf("%c", picos_cache[j]);

@@ -7,7 +7,7 @@
 
 typedef unsigned long addr_t;
 
-#define EXTERN_NULL NULL
+#define EXTERN_NULL 0
 
 static void extern_memory_read(addr_t block_addr, unsigned char *dest)
 {
