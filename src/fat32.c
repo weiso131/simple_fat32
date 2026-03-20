@@ -193,15 +193,11 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
         if (write_cnt < size) {
             uint32_t first_sec = get_clus_first_sec(fs, clus);
             for (uint8_t i = 0;i < fs->sec_per_clus;i++) {
-                if (write_cnt + BLOCK_SIZE > size) {
-                    // To avoid wrong memory copy
-                    uint8_t *tmp = malloc(BLOCK_SIZE);
-                    memcpy(tmp, buf + write_cnt, size - write_cnt);
-                    write_sector(first_sec + i, tmp);
-                    free(tmp);
-                } else
-                    write_sector(first_sec + i, buf + write_cnt);
-                
+                for (uint16_t j = write_cnt;j < (write_cnt + BLOCK_SIZE) && j < size;j += 64) {
+                    memcpy(picos_cache, buf + j, min(64, size - j));
+                    extern_memory_write(tmp_extern_buf + j - write_cnt, picos_cache);
+                }
+                picos_write_sector(first_sec + i, tmp_extern_buf);
                 write_cnt += BLOCK_SIZE;
                 if (write_cnt >= size) {
                     // update fat buffer to END_OF_CLUS
@@ -247,18 +243,15 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
         update_new_fsi_nxt_free(fs, fat_extern_buf, fat_sec);
         uint32_t first_sec = get_clus_first_sec(fs, clus);
         for (uint8_t i = 0;i < fs->sec_per_clus && write_cnt < size;i++, write_cnt += BLOCK_SIZE) {
-            if (write_cnt + BLOCK_SIZE > size) {
-                // To avoid wrong memory copy
-                uint8_t *tmp = malloc(BLOCK_SIZE);
-                memcpy(tmp, buf + write_cnt, size - write_cnt);
-                write_sector(first_sec + i, tmp);
-                free(tmp);
-            } else
-                write_sector(first_sec + i, buf + write_cnt);
+            for (uint16_t j = write_cnt;j < (write_cnt + BLOCK_SIZE) && j < size;j += 64) {
+                memcpy(picos_cache, buf + j, min(64, size - j));
+                extern_memory_write(tmp_extern_buf + j - write_cnt, picos_cache);
+            }
+            picos_write_sector(first_sec + i, tmp_extern_buf);
+            
                 
         }
     }
-
     picos_write_sector(fat_sec, fat_extern_buf);
 
     picos_memory_release(fat_extern_buf);
@@ -352,10 +345,14 @@ int main()
 
     for (uint32_t i = 0;i < target_size;i += 64) {
         extern_memory_read(target_buf + i, picos_cache);
-        for (int j = 0;j < 64;j++)
+        for (uint32_t j = 0;j < 64;j++) {
+            if (i + j == target->file_size)
+                goto end_cat;
             printf("%c", picos_cache[j]);
+        }
+            
     }
-
+end_cat:
     printf("\n");
 
 
