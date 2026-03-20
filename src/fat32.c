@@ -177,10 +177,11 @@ fsi_nxt_free_still_free:
 void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
 {
     uint32_t clus = file->fst_clus, last_clus = file->fst_clus;
-    uint8_t *fat_buf = malloc(BLOCK_SIZE);
+    addr_t fat_extern_buf = picos_memory_alloc(BLOCK_SIZE >> 6);
+    addr_t tmp_extern_buf = picos_memory_alloc(BLOCK_SIZE >> 6);
     uint32_t fat_sec = get_clus_fat_sec(fs, clus);
-    read_sector(fat_sec, fat_buf);
-
+    picos_read_sector(fat_sec, fat_extern_buf);
+    extern_memory_read(fat_extern_buf + ((((clus * 4) % (fs)->byte_per_sec) / 64) * 64), picos_fat_cache);
     uint32_t write_cnt = 0;
 
     file->attr |= DIR_ATTR_DIRTY;
@@ -188,7 +189,7 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
     file->file_size = size;
 
     while (clus < END_OF_CLUS) {
-        uint32_t next_clus = get_next_clus(fs, clus, fat_buf);
+        uint32_t next_clus = get_next_clus(fs, clus, picos_fat_cache);
         if (write_cnt < size) {
             uint32_t first_sec = get_clus_first_sec(fs, clus);
             for (uint8_t i = 0;i < fs->sec_per_clus;i++) {
@@ -204,22 +205,25 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
                 write_cnt += BLOCK_SIZE;
                 if (write_cnt >= size) {
                     // update fat buffer to END_OF_CLUS
-                    set_next_clus(fs, clus, fat_buf, END_OF_CLUS);
+                    set_next_clus(fs, clus, picos_fat_cache, END_OF_CLUS);
                     break;
                 }
             }
         } else {
-            set_next_clus(fs, clus, fat_buf, 0);
+            set_next_clus(fs, clus, picos_fat_cache, 0);
             fs->fsi_free_cnt++;
             fs->fsi_nxt_free = min(fs->fsi_nxt_free, clus);
         }
 
+        // maybe can reduce write
+        extern_memory_write(fat_extern_buf + ((((clus * 4) % (fs)->byte_per_sec) / 64) * 64), picos_fat_cache);
         if (get_clus_fat_sec(fs, clus) != fat_sec) {
             // write back the FAT
             if (write_cnt >= size)
-                write_sector(fat_sec, fat_buf);
+                picos_write_sector(fat_sec, fat_extern_buf);
             fat_sec = get_clus_fat_sec(fs, clus);
-            read_sector(fat_sec, fat_buf);
+            picos_read_sector(fat_sec, fat_extern_buf);
+            extern_memory_read(fat_extern_buf + ((((clus * 4) % (fs)->byte_per_sec) / 64) * 64), picos_fat_cache);
         }
         last_clus = clus;
         clus = next_clus;
@@ -228,16 +232,19 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
 
     clus = last_clus;
     while (write_cnt < size) {
-        set_next_clus(fs, clus, fat_buf, fs->fsi_nxt_free);
-        set_next_clus(fs, fs->fsi_nxt_free, fat_buf, END_OF_CLUS);
+        // read/write maybe can reduce
+        extern_memory_read(fat_extern_buf + ((((clus * 4) % (fs)->byte_per_sec) / 64) * 64), picos_fat_cache);
+        set_next_clus(fs, clus, picos_fat_cache, fs->fsi_nxt_free);
+        set_next_clus(fs, fs->fsi_nxt_free, picos_fat_cache, END_OF_CLUS);
+        extern_memory_write(fat_extern_buf + ((((clus * 4) % (fs)->byte_per_sec) / 64) * 64), picos_fat_cache);
         clus = fs->fsi_nxt_free;
         if (get_clus_fat_sec(fs, clus) != fat_sec) {
             // write back the FAT
-            write_sector(fat_sec, fat_buf);
+            picos_write_sector(fat_sec, fat_extern_buf);
             fat_sec = get_clus_fat_sec(fs, clus);
-            read_sector(fat_sec, fat_buf);
+            picos_read_sector(fat_sec, fat_extern_buf);
         }
-        update_new_fsi_nxt_free(fs, (addr_t)fat_buf, fat_sec);
+        update_new_fsi_nxt_free(fs, fat_extern_buf, fat_sec);
         uint32_t first_sec = get_clus_first_sec(fs, clus);
         for (uint8_t i = 0;i < fs->sec_per_clus && write_cnt < size;i++, write_cnt += BLOCK_SIZE) {
             if (write_cnt + BLOCK_SIZE > size) {
@@ -252,9 +259,10 @@ void write_file(fat32_t *fs, file_t *file, const void *buf, size_t size)
         }
     }
 
-    write_sector(fat_sec, fat_buf);
+    picos_write_sector(fat_sec, fat_extern_buf);
 
-    free(fat_buf);
+    picos_memory_release(fat_extern_buf);
+    picos_memory_release(tmp_extern_buf);
     return;
 }
 
