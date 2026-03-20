@@ -335,13 +335,13 @@ int main()
     mount_disk("disk.bin");
 
     fat32_t *fs = create_fat32();
-    dir_block_t *root = load_dir(fs, fs->root_clus);
+    addr_t root = load_dir(fs, fs->root_clus);
 
-    ls_dir((addr_t)root);
+    ls_dir(root);
 
     char target_name[] = "meow.txt";
 
-    addr_t target_addr = find_file((addr_t)root, target_name, sizeof(target_name));
+    addr_t target_addr = find_file(root, target_name, sizeof(target_name));
     extern_memory_read(target_addr, file_cache);
     file_t *target = (file_t *)file_cache;
 
@@ -372,11 +372,11 @@ end_cat:
     write_file(fs, target, text, sizeof(text));
     extern_memory_write(target_addr, file_cache);
 
-    dir_update(fs, (addr_t) root);   
+    dir_update(fs, root);   
 
     release_fat32(&fs);
     unmount_disk();
 
-    free_dir_block((addr_t)root);
+    free_dir_block(root);
 
 }

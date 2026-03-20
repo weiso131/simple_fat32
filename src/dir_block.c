@@ -6,7 +6,7 @@
 #include <fat32_util.h>
 #include <dir_block.h>
 
-dir_block_t *load_dir(fat32_t *fs, uint32_t clus)
+addr_t load_dir(fat32_t *fs, uint32_t clus)
 {
     addr_t dir_buf = picos_memory_alloc(BLOCK_SIZE / 64);
     fat32_dir_t *dir_cache = (fat32_dir_t *)picos_cache;
@@ -101,7 +101,7 @@ ls_end:
     now->next = EXTERN_NULL;
     extern_memory_write(now_addr, (uint8_t *)now);
     
-    return (dir_block_t *)head;
+    return head;
 }
 
 void free_dir_block(addr_t dir)
