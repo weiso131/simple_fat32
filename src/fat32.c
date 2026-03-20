@@ -151,7 +151,7 @@ void update_new_fsi_nxt_free(fat32_t *fs, addr_t fat_extern_buf, uint32_t fat_se
         flag = 1;
     }
 
-    extern_memory_read(fat_extern_buf, picos_fat_cache);
+    extern_memory_read(fat_extern_buf + ((((fs->fsi_nxt_free * 4) % (fs)->byte_per_sec) / 64) * 64), picos_fat_cache);
 
     if (get_next_clus(fs, fs->fsi_nxt_free, picos_fat_cache) == 0) 
         goto fsi_nxt_free_still_free;
@@ -163,8 +163,8 @@ void update_new_fsi_nxt_free(fat32_t *fs, addr_t fat_extern_buf, uint32_t fat_se
         if (((fs)->first_fat_sec + (fs->fsi_nxt_free * 4) / (fs)->byte_per_sec) != fat_sec) {
             fat_sec = ((fs)->first_fat_sec + (fs->fsi_nxt_free * 4) / (fs)->byte_per_sec);
             picos_read_sector(fat_sec, fat_extern_buf);
-            extern_memory_read(fat_extern_buf, picos_fat_cache);
         }
+        extern_memory_read(fat_extern_buf + ((((fs->fsi_nxt_free * 4) % (fs)->byte_per_sec) / 64) * 64), picos_fat_cache);
     }
     fs->fsi_free_cnt--;
 
